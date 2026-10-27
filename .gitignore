@@ -1,0 +1,11 @@
+target/
+project/target/
+project/project/
+.bsp/
+.idea/
+*.iml
+.metals/
+.bloop/
+.vscode/
+# keep your own rounds out of git
+data/private/

@@ -1,0 +1,6 @@
+{
+  "name": "Demo Golfer",
+  "handicap": 13.8,
+  "homeCourse": "Tali",
+  "goals": ["Break 80 this season", "Average under 32 putts", "Max 1 penalty per round"]
+}
