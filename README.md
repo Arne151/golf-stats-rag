@@ -82,7 +82,7 @@ rounds, course or date range.
 2. **Open the project**: *File → Open…* → select the `golf-stats-rag` folder (the one with `build.sbt`) →
    *Open as Project*. IntelliJ detects sbt and imports it. The first import downloads dependencies and takes a minute or two.
 3. **JDK**: if asked, choose JDK 17 or 21 (*File → Project Structure → Project → SDK*; IntelliJ can download one).
-4. **Run the tests**: right-click `src/test/scala` → *Run 'All Tests'*. You should get 19 passing tests.
+4. **Run the tests**: right-click `src/test/scala` → *Run 'All Tests'*. You should get 21 passing tests.
 5. **Run the app**: open `src/main/scala/golfrag/Main.scala` and click the green ▶ next to `object Main`.
    It starts in offline mode with the sample data. Type questions into the Run console.
 
@@ -101,9 +101,18 @@ rounds, course or date range.
 **Option C: Claude (paid, best answers).** Key from <https://console.anthropic.com> → `ANTHROPIC_API_KEY=...`
 (optional `LLM_MODEL` to choose the model). OpenAI also works with `OPENAI_API_KEY`.
 
-**Option D: Ollama (free, runs locally, no key).** Install from <https://ollama.com>, then
-`ollama pull llama3.1` and use program arguments `--llm ollama`. For semantic embeddings, also run
-`ollama pull nomic-embed-text` and add `--embedder ollama`.
+**Option D: Ollama (free, runs on your own computer, no key).**
+1. Install Ollama from <https://ollama.com/download> and start it (on Windows it runs in the system tray).
+2. In a terminal (PowerShell, or IntelliJ's *Terminal* tab), download a model that supports tool calling:
+   `ollama pull llama3.1` (about 5 GB, needs roughly 8 GB of free RAM). On a lower-spec PC, try `ollama pull qwen2.5:3b`.
+3. Run `Main`. When no API key is set and Ollama is running, the app uses it automatically and picks
+   your best downloaded model. To force it, use program argument `--llm ollama`. To choose a model,
+   set `OLLAMA_MODEL=qwen2.5:3b`.
+4. Optional, for real semantic search: `ollama pull nomic-embed-text` and add `--embedder ollama`.
+
+Local models are slower than cloud APIs (a few seconds to a minute per answer, depending on your
+hardware), and small models follow tool instructions less reliably. If answers look wrong,
+`--verbose` shows whether the model actually called `compute_stat`.
 
 If several keys are set, pick one with `--llm gemini|groq|openai|anthropic|ollama|offline`.
 Never commit your API key: keep it in the run configuration (`.idea/` is git-ignored).

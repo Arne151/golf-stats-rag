@@ -80,7 +80,9 @@ object Main {
     val modelOverride = env("LLM_MODEL")
     // With no --llm flag, use whichever API key is set.
     val autoChoice = List("ANTHROPIC_API_KEY" -> "anthropic", "GEMINI_API_KEY" -> "gemini", "GROQ_API_KEY" -> "groq",
-      "OPENAI_API_KEY" -> "openai").collectFirst { case (k, p) if env(k).isDefined => p }.getOrElse("offline")
+      "OPENAI_API_KEY" -> "openai").collectFirst { case (k, p) if env(k).isDefined => p }
+      // No key? Use Ollama if it's running on this machine, otherwise the offline mode.
+      .getOrElse(if (Ollama.isRunning(ollamaUrl)) "ollama" else "offline")
 
     choice.getOrElse(autoChoice) match {
       case "anthropic" =>
@@ -93,7 +95,9 @@ object Main {
           .toRight(s"${preset.keyEnv} is not set. Get a key at ${preset.keyUrl}")
           .flatMap(k => OpenAiCompatibleClient.fromPreset(preset, k, modelOverride))
           .map(Some(_))
-      case "ollama"  => Right(Some(new OllamaClient(modelOverride.orElse(env("OLLAMA_MODEL")).getOrElse("llama3.1"), ollamaUrl)))
+      case "ollama"  =>
+        Ollama.resolveModel(ollamaUrl, modelOverride.orElse(env("OLLAMA_MODEL")))
+          .map(model => Some(new OllamaClient(model, ollamaUrl)))
       case "offline" => Right(None)
       case other     => Left(s"unknown LLM provider '$other'")
     }
@@ -118,7 +122,13 @@ object Main {
     if (data.rounds.isEmpty) println("Warning: no rounds were loaded – only notes search will work.")
 
     val embedder: Embedder = o.embedder.getOrElse("hashing") match {
-      case "ollama" => new OllamaEmbedder(env("OLLAMA_EMBED_MODEL").getOrElse("nomic-embed-text"), env("OLLAMA_URL").getOrElse("http://localhost:11434"))
+      case "ollama" =>
+        val url   = env("OLLAMA_URL").getOrElse("http://localhost:11434")
+        val model = env("OLLAMA_EMBED_MODEL").getOrElse("nomic-embed-text")
+        Ollama.requireModel(url, model) match {
+          case Left(err) => System.err.println(s"Error: $err"); sys.exit(2)
+          case Right(m)  => new OllamaEmbedder(m, url)
+        }
       case _        => new HashingEmbedder()
     }
     val store = new InMemoryVectorStore(embedder)
@@ -137,7 +147,10 @@ object Main {
 
     def answer(q: String): Unit =
       try println(s"\n${assistant.ask(q)}\n")
-      catch { case NonFatal(e) => println(s"\nError: ${e.getMessage}\n") }
+      catch {
+        case _: java.net.ConnectException => println("\nError: could not connect to the AI service. If you use Ollama, make sure the Ollama app is running.\n")
+        case NonFatal(e)                  => println(s"\nError: ${Option(e.getMessage).getOrElse(e.toString)}\n")
+      }
 
     o.ask match {
       case Some(q) => answer(q)
