@@ -58,7 +58,8 @@ flowchart LR
 - **Handicap** from a profile JSON, from the PDF header (`Handicap index: 14,2`) or from `--handicap`.
 - **Pluggable embeddings**: an offline hashing embedder (no setup, deterministic) or real
   semantic embeddings from Ollama (`nomic-embed-text`).
-- **Pluggable LLMs**: Claude (Anthropic API) or any local Ollama model with tool calling.
+- **Pluggable LLMs**: Gemini (free tier), Groq, OpenAI, Claude, or a local Ollama model. Any
+  OpenAI-compatible API works, with automatic retry when a free tier's rate limit is hit.
 - **Agent loop** with multi-step tool calls, error feedback to the model and conversation memory
   for follow-up questions.
 - **Offline mode**: with no LLM at all, a keyword intent parser still answers common stat questions.
@@ -81,22 +82,31 @@ rounds, course or date range.
 2. **Open the project**: *File → Open…* → select the `golf-stats-rag` folder (the one with `build.sbt`) →
    *Open as Project*. IntelliJ detects sbt and imports it. The first import downloads dependencies and takes a minute or two.
 3. **JDK**: if asked, choose JDK 17 or 21 (*File → Project Structure → Project → SDK*; IntelliJ can download one).
-4. **Run the tests**: right-click `src/test/scala` → *Run 'All Tests'*. You should get 17 passing tests.
+4. **Run the tests**: right-click `src/test/scala` → *Run 'All Tests'*. You should get 19 passing tests.
 5. **Run the app**: open `src/main/scala/golfrag/Main.scala` and click the green ▶ next to `object Main`.
    It starts in offline mode with the sample data. Type questions into the Run console.
 
 ### Using a real LLM
 
-**Option A: Claude (best answers).** Get an API key at <https://console.anthropic.com>, then in IntelliJ:
-*Run → Edit Configurations… → Main → Environment variables* → add `ANTHROPIC_API_KEY=sk-ant-...`.
-(Optional: `ANTHROPIC_MODEL` to choose another model.)
+**Option A: Google Gemini (free, recommended to start).**
+1. Get a free API key at <https://aistudio.google.com/apikey> (sign in with Google, then *Create API key*; no credit card needed).
+2. In IntelliJ: *Run → Edit Configurations… → Main → Environment variables* → add `GEMINI_API_KEY=your-key`.
+3. Run `Main`. It detects the key and picks the newest available Gemini *flash* model automatically
+   (or set `LLM_MODEL` to choose one). Free tiers allow only a few requests per minute. If you hit the
+   limit, the app waits and retries by itself.
 
-**Option B: Ollama (free, local).** Install from <https://ollama.com>, then:
-```bash
-ollama pull llama3.1          # chat model with tool calling
-ollama pull nomic-embed-text  # embeddings (optional)
-```
-Program arguments: `--llm ollama --embedder ollama`
+**Option B: Groq (free).** Key from <https://console.groq.com/keys> → `GROQ_API_KEY=...`
+(default model `llama-3.3-70b-versatile`; override with `LLM_MODEL`).
+
+**Option C: Claude (paid, best answers).** Key from <https://console.anthropic.com> → `ANTHROPIC_API_KEY=...`
+(optional `LLM_MODEL` to choose the model). OpenAI also works with `OPENAI_API_KEY`.
+
+**Option D: Ollama (free, runs locally, no key).** Install from <https://ollama.com>, then
+`ollama pull llama3.1` and use program arguments `--llm ollama`. For semantic embeddings, also run
+`ollama pull nomic-embed-text` and add `--embedder ollama`.
+
+If several keys are set, pick one with `--llm gemini|groq|openai|anthropic|ollama|offline`.
+Never commit your API key: keep it in the run configuration (`.idea/` is git-ignored).
 
 ### Using your own data
 
@@ -157,7 +167,7 @@ src/main/scala/golfrag/
 > **Golf Stats RAG Assistant (Scala 3).** A question-answering assistant over personal golf data, using
 > retrieval-augmented generation and LLM tool calling. Built PDF/CSV ingestion (Apache PDFBox) with
 > an LLM-based structured-extraction fallback, a vector-retrieval pipeline with pluggable embedders,
-> and a provider-neutral agent loop supporting Claude and local Ollama models. Number questions go
+> and a provider-neutral agent loop supporting Gemini, Claude, OpenAI-compatible APIs and local Ollama models. Number questions go
 > to a deterministic stats engine through tool calls, so answers are exact. Covered by a munit test
 > suite that includes a scripted fake LLM.
 

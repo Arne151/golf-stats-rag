@@ -45,15 +45,36 @@ object Json {
 object Http {
   private val client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(15)).build()
 
-  def postJson(url: String, body: ujson.Value, headers: Map[String, String] = Map.empty): ujson.Value = {
-    val builder = HttpRequest.newBuilder(URI.create(url))
-      .timeout(Duration.ofSeconds(120))
-      .header("content-type", "application/json")
-      .POST(HttpRequest.BodyPublishers.ofString(ujson.write(body)))
+  def postJson(url: String, body: ujson.Value, headers: Map[String, String] = Map.empty): ujson.Value =
+    send(url, headers, _.header("content-type", "application/json").POST(HttpRequest.BodyPublishers.ofString(ujson.write(body))))
+
+  def getJson(url: String, headers: Map[String, String] = Map.empty): ujson.Value =
+    send(url, headers, _.GET())
+
+  /**
+   * Sends a request, retrying on 429 (rate limited) and 503 (overloaded). Free API tiers allow only a
+   * few requests per minute, so waiting a little is much better than failing the question.
+   */
+  private def send(url: String, headers: Map[String, String], method: HttpRequest.Builder => HttpRequest.Builder,
+                   maxRetries: Int = 3): ujson.Value = {
+    val builder = method(HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(120)))
     headers.foreach { case (k, v) => builder.header(k, v) }
-    val response = client.send(builder.build(), HttpResponse.BodyHandlers.ofString())
-    if (response.statusCode() / 100 != 2)
-      throw new LlmException(s"HTTP ${response.statusCode()} from $url: ${response.body().take(500)}")
-    ujson.read(response.body())
+    val request = builder.build()
+
+    @annotation.tailrec
+    def attempt(n: Int): ujson.Value = {
+      val response = client.send(request, HttpResponse.BodyHandlers.ofString())
+      val status   = response.statusCode()
+      if (status / 100 == 2) ujson.read(response.body())
+      else if ((status == 429 || status == 503) && n < maxRetries) {
+        val waitSeconds = response.headers().firstValue("retry-after").map[Option[Long]](v => v.toLongOption).orElse(None)
+          .getOrElse(10L * (n + 1)).min(60L)
+        System.err.println(s"  (rate limited by the API, waiting ${waitSeconds}s and retrying...)")
+        Thread.sleep(waitSeconds * 1000)
+        attempt(n + 1)
+      } else
+        throw new LlmException(s"HTTP $status from ${url.takeWhile(_ != '?')}: ${response.body().take(500)}")
+    }
+    attempt(0)
   }
 }

@@ -38,13 +38,15 @@ object Main {
       |  --rounds <file>        Rounds file (.pdf, .csv, .txt). Repeatable. Bare file arguments work too.
       |  --profile <file.json>  Player profile (name, handicap, homeCourse, goals)
       |  --handicap <number>    Handicap index (overrides profile / PDF)
-      |  --llm <provider>       anthropic | ollama | offline   (default: anthropic if ANTHROPIC_API_KEY is set, else offline)
+      |  --llm <provider>       gemini | groq | openai | anthropic | ollama | offline
+      |                         (default: the first provider whose API key is set, else offline)
       |  --embedder <name>      hashing | ollama               (default: hashing)
       |  --ask "<question>"     Answer one question and exit
       |  --verbose              Show retrieval hits and tool calls
       |  --generate-sample-pdf <out.pdf>  Write a demo PDF of rounds and exit
       |
-      |Environment: ANTHROPIC_API_KEY, ANTHROPIC_MODEL, OLLAMA_URL, OLLAMA_MODEL, OLLAMA_EMBED_MODEL""".stripMargin
+      |Environment: GEMINI_API_KEY, GROQ_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY,
+      |             LLM_MODEL (override the model), OLLAMA_URL, OLLAMA_MODEL, OLLAMA_EMBED_MODEL""".stripMargin
 
   def parseArgs(args: List[String], o: Options = Options()): Either[String, Options] = args match {
     case Nil                               => Right(o)
@@ -75,12 +77,23 @@ object Main {
 
   def buildLlm(choice: Option[String]): Either[String, Option[LlmClient]] = {
     val ollamaUrl = env("OLLAMA_URL").getOrElse("http://localhost:11434")
-    choice.getOrElse(if (env("ANTHROPIC_API_KEY").isDefined) "anthropic" else "offline") match {
+    val modelOverride = env("LLM_MODEL")
+    // With no --llm flag, use whichever API key is set.
+    val autoChoice = List("ANTHROPIC_API_KEY" -> "anthropic", "GEMINI_API_KEY" -> "gemini", "GROQ_API_KEY" -> "groq",
+      "OPENAI_API_KEY" -> "openai").collectFirst { case (k, p) if env(k).isDefined => p }.getOrElse("offline")
+
+    choice.getOrElse(autoChoice) match {
       case "anthropic" =>
         env("ANTHROPIC_API_KEY")
           .toRight("ANTHROPIC_API_KEY is not set")
-          .map(k => Some(new AnthropicClient(k, env("ANTHROPIC_MODEL").getOrElse(AnthropicClient.DefaultModel))))
-      case "ollama"  => Right(Some(new OllamaClient(env("OLLAMA_MODEL").getOrElse("llama3.1"), ollamaUrl)))
+          .map(k => Some(new AnthropicClient(k, modelOverride.orElse(env("ANTHROPIC_MODEL")).getOrElse(AnthropicClient.DefaultModel))))
+      case p if OpenAiCompatibleClient.presets.contains(p) =>
+        val preset = OpenAiCompatibleClient.presets(p)
+        env(preset.keyEnv)
+          .toRight(s"${preset.keyEnv} is not set. Get a key at ${preset.keyUrl}")
+          .flatMap(k => OpenAiCompatibleClient.fromPreset(preset, k, modelOverride))
+          .map(Some(_))
+      case "ollama"  => Right(Some(new OllamaClient(modelOverride.orElse(env("OLLAMA_MODEL")).getOrElse("llama3.1"), ollamaUrl)))
       case "offline" => Right(None)
       case other     => Left(s"unknown LLM provider '$other'")
     }
