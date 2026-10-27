@@ -75,9 +75,6 @@ rounds, course or date range.
 
 ## Getting started in IntelliJ IDEA (Community 2025.2)
 
-> Note: *2025.2.51* is the version of IntelliJ's **Scala plugin**. The Scala **language** version used here
-> is **Scala 3.3.6 (LTS)**, set in `build.sbt`. sbt downloads it automatically.
-
 1. **Install the Scala plugin** if you haven't: *Settings → Plugins → Marketplace → "Scala"*.
 2. **Open the project**: *File → Open…* → select the `golf-stats-rag` folder (the one with `build.sbt`) →
    *Open as Project*. IntelliJ detects sbt and imports it. The first import downloads dependencies and takes a minute or two.
@@ -171,14 +168,5 @@ src/main/scala/golfrag/
 - A small web UI (http4s or Play) or a chart of trends.
 - Evaluation set: question → expected answer, to measure accuracy across LLMs and prompts.
 
-## For your CV
-
-> **Golf Stats RAG Assistant (Scala 3).** A question-answering assistant over personal golf data, using
-> retrieval-augmented generation and LLM tool calling. Built PDF/CSV ingestion (Apache PDFBox) with
-> an LLM-based structured-extraction fallback, a vector-retrieval pipeline with pluggable embedders,
-> and a provider-neutral agent loop supporting Gemini, Claude, OpenAI-compatible APIs and local Ollama models. Number questions go
-> to a deterministic stats engine through tool calls, so answers are exact. Covered by a munit test
-> suite that includes a scripted fake LLM.
-
-*Skills:* Scala 3, functional design (ADTs, enums, `Either` error handling), sbt, REST/JSON integration,
+*Skills improved:* Scala 3, functional design (ADTs, enums, `Either` error handling), sbt, REST/JSON integration,
 LLM tool use, RAG, embeddings and vector search, PDF parsing, unit testing.
